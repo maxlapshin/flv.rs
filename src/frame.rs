@@ -1,22 +1,25 @@
 
-enum Flavor {
+#[derive(Debug)]
+pub enum Flavor {
   Config,
   Keyframe,
   Frame
 }
 
-enum Content {
+#[derive(Debug)]
+pub enum Content {
   Metadata,
   Video,
   Audio
 }
 
+#[derive(Debug)]
 pub struct Frame {
-  dts: i64, // in 90 Khz baze
-  pts: i64,
-  duration: i32,
-  flavor: Flavor,
-  content: Content,
-  body: Vec<u8>
+  pub dts: i64, // in 90 Khz baze
+  pub pts: i64,
+  pub duration: i32,
+  pub flavor: Flavor,
+  pub content: Content,
+  pub body: Vec<u8>
 }
 

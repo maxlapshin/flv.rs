@@ -1,8 +1,8 @@
 // extern crate futures;
 // extern crate tokio_core;
 extern crate getopts;
-mod flv;
-mod frame;
+pub mod flv;
+pub mod frame;
 
 // use futures::{Future, Stream};
 // use tokio_core::io::{copy, Io};
@@ -10,6 +10,8 @@ mod frame;
 // use tokio_core::reactor::Core;
 use getopts::Options;
 use std::env;
+use std::fs::File;
+
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -21,8 +23,8 @@ fn main() {
         Ok(m) => { m }
         Err(f) => { panic!(f.to_string()) }
     };    
-    if matches.opt_present("f") && !matches.free.is_empty() {
-        dump_flv(matches.free[0].clone());
+    if matches.opt_present("f") {
+        dump_flv(matches.opt_str("f").unwrap().clone());
         return;
     }
     // Create the event loop that will drive this server
@@ -63,5 +65,18 @@ fn main() {
 
 
 fn dump_flv(path: String) {
-
+    let mut f = File::open(path).unwrap();
+    let mut done = false;
+    while !done {
+        let result = flv::read_frame(&mut f);
+        match result {
+            Ok(frame) => {
+                println!("{:?}", frame);
+            }
+            Err(err) => {
+                println!("{:?}", err);
+                return
+            }
+        }
+    }
 }
