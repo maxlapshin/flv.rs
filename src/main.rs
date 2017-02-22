@@ -1,5 +1,5 @@
-// extern crate futures;
-// extern crate tokio_core;
+extern crate futures;
+extern crate tokio_core;
 extern crate getopts;
 pub mod flv;
 pub mod frame;
@@ -10,7 +10,7 @@ pub mod frame;
 // use tokio_core::reactor::Core;
 use getopts::Options;
 use std::env;
-use std::fs::File;
+use flv::FlvStream;
 
 
 fn main() {
@@ -65,17 +65,9 @@ fn main() {
 
 
 fn dump_flv(path: String) {
-    let mut f = File::open(path).unwrap();
+    let mut f = FlvStream::new(path);
     loop {
-        let result = flv::read_frame(&mut f);
-        match result {
-            Ok(frame) => {
-                println!("{:?}", frame);
-            }
-            Err(err) => {
-                println!("{:?}", err);
-                return
-            }
-        }
+        let frame = f.next();
+        println!("{:?}", frame);
     }
 }

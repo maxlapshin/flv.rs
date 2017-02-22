@@ -1,8 +1,20 @@
+
 use frame::Frame;
 use frame::Content;
 use frame::Flavor;
 use frame::Codec;
 use std;
+use std::result::Result;
+use std::fs::File;
+use std::io::SeekFrom;
+use std::io::Seek;
+use std::time::Duration;
+
+use tokio_core::reactor::Timeout;
+use tokio_core::reactor::Handle;
+use futures::Future;
+
+use futures::stream;
 
 #[derive(Debug)]
 pub enum ReadError {
@@ -23,6 +35,62 @@ impl std::convert::From<std::io::Error> for ReadError {
     ReadError::Eof
   }
 }
+
+
+pub struct FlvStream {
+  input: std::fs::File,
+}
+
+impl FlvStream {
+  pub fn new(path: String) -> FlvStream {
+    let f = File::open(path).unwrap();
+    FlvStream{ input: f}
+  }
+
+  pub fn next(&mut self) -> Frame {
+    match read_frame(&mut self.input) {
+      Ok(frame) => frame,
+      Err(ReadError::Eof) => {
+        self.input.seek(SeekFrom::Start(13)).unwrap();
+        read_frame(&mut self.input).unwrap()
+      }
+      Err(_) => panic!()
+    }
+  }
+
+  // pub fn timeout<'a>(handle: Handle) -> impl Future<Item = Self, Error = Error> + 'a {
+  //   let duration = Duration::from_millis(40);
+  //   Timeout::new(&duration, &handle).unwrap().map(|_| self)
+  // }
+}
+
+// pub fn periodic_reader(path: String, handle: Handle) -> futures::stream::Unfold {
+//   let s = FlvStream::new(path);
+//   stream::unfold(s, {
+//     let duration = Duration::from_millis(40);
+//     let timer = Timeout::new(duration, &handle).unwrap().map(|_| s);
+//     let frame = timer.and_then(|_| s.next());
+//     Some(frame)
+//   })
+// }
+
+// stream::unfold(State::NotFinish(handler), move |state| match state {
+//     State::NotFinish(handler) => {
+//         let timeout = handler.timeout();
+//         let read= timeout.and_then(|handler| handler.read_frame());
+//         let process = read.and_then(|(handler, payload)| handler.process(payload));
+//         let map = process.map(|handler| {
+//             let next_state = if handler.is_finish() {
+//                 State::Finish
+//             } else {
+//                 State::NotFinish(handler)
+//             };
+//             (handler, next_state)
+//         });
+//         Some(map)
+//     }
+//     State::Finish => None,
+// })
 
 pub fn read_frame<T: std::io::Read>(input: &mut T) -> Result<Frame, ReadError> {
   let mut header = [0;11];
