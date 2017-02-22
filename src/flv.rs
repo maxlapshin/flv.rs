@@ -1,6 +1,7 @@
 use frame::Frame;
 use frame::Content;
 use frame::Flavor;
+use frame::Codec;
 use std;
 
 #[derive(Debug)]
@@ -18,7 +19,7 @@ pub enum ReadError {
 }
 
 impl std::convert::From<std::io::Error> for ReadError {
-  fn from(e: std::io::Error) -> Self {
+  fn from(_: std::io::Error) -> Self {
     ReadError::Eof
   }
 }
@@ -26,12 +27,7 @@ impl std::convert::From<std::io::Error> for ReadError {
 pub fn read_frame<T: std::io::Read>(input: &mut T) -> Result<Frame, ReadError> {
   let mut header = [0;11];
 
-  match input.read(&mut header[..]) {
-    Ok(11) => {}
-    Ok(0) => {return Err(ReadError::Eof)}
-    Ok(read_bytes) => {return Err(ReadError::TooShortPrefix)}
-    Err(err) => { return Err(ReadError::Eof)}
-  }
+  try!(input.read_exact(&mut header[..]));
 
 
   if header[0] == 'F' as u8 && header[1] == 'L' as u8 {
@@ -39,14 +35,14 @@ pub fn read_frame<T: std::io::Read>(input: &mut T) -> Result<Frame, ReadError> {
     let mut skip = [0; 2];
     match input.read(&mut skip[..]) {
       Ok(2) => {}
-      Ok(read_bytes) => {return Err(ReadError::TooShortTrailer)}
-      Err(err) => { return Err(ReadError::Eof)}
+      Ok(_) => {return Err(ReadError::TooShortTrailer)}
+      Err(_) => { return Err(ReadError::Eof)}
     }
 
     match input.read(&mut header[..]) {
       Ok(11) => {}
-      Ok(read_bytes) => {return Err(ReadError::TooShortFrameHeader)}
-      Err(err) => { return Err(ReadError::Eof)}
+      Ok(_) => {return Err(ReadError::TooShortFrameHeader)}
+      Err(_) => { return Err(ReadError::Eof)}
     }
   }
 
@@ -81,7 +77,7 @@ pub fn read_frame<T: std::io::Read>(input: &mut T) -> Result<Frame, ReadError> {
       let mut video_tag = [0;5];
       try!(input.read_exact(&mut video_tag[..]));
 
-      if ((video_tag[0] & 15) != 7) { 
+      if (video_tag[0] & 15) != 7 { 
         return Err(ReadError::InvalidVideoCodec)
       }
       let mut flavor = Flavor::Frame;
@@ -102,30 +98,33 @@ pub fn read_frame<T: std::io::Read>(input: &mut T) -> Result<Frame, ReadError> {
             return Err(ReadError::TooShortFrameBody)
           }
         }
-        Err(err) => { return Err(ReadError::Eof)}
+        Err(_) => { return Err(ReadError::Eof)}
       }
+      let codec = Codec::H264;
 
-      Frame{dts: timestamp as i64, pts: (timestamp+ctime) as i64, duration: 0, flavor: flavor, content: content, body: body}
+      Frame{dts: timestamp as i64, pts: (timestamp+ctime) as i64, duration: 0, flavor: flavor, content: content, body: body, codec: codec}
     }
     Content::Audio => {
       let mut audio_tag = [0;2];
       try!(input.read_exact(&mut audio_tag[..]));
 
-      if ((audio_tag[0] >> 4) != 10) { 
+      if (audio_tag[0] >> 4) != 10 { 
         return Err(ReadError::InvalidAudioCodec)
       }
       let mut flavor = Flavor::Frame;
-      if(audio_tag[1] == 0) {
+      if audio_tag[1] == 0 {
         flavor = Flavor::Config;
       }
       let mut body = vec![0;disk_size - 2];
       try!(input.read_exact(&mut body[..]));
-      Frame{dts: timestamp as i64, pts: timestamp as i64, duration: 0, flavor: flavor, content: content, body: body}      
+      let codec = Codec::Aac;
+      Frame{dts: timestamp as i64, pts: timestamp as i64, duration: 0, flavor: flavor, content: content, body: body, codec: codec}      
     }
     Content::Metadata => {
       let mut body = vec![0;disk_size];
       try!(input.read_exact(&mut body[..]));
-      Frame{dts: timestamp as i64, pts: timestamp as i64, duration: 0, flavor: Flavor::Frame, content: content, body: body}
+      let codec = Codec::Amf;
+      Frame{dts: timestamp as i64, pts: timestamp as i64, duration: 0, flavor: Flavor::Frame, content: content, body: body, codec: codec}
     }
   };
 
@@ -133,8 +132,8 @@ pub fn read_frame<T: std::io::Read>(input: &mut T) -> Result<Frame, ReadError> {
   let mut prev_tag_size = [0;4];
   match input.read(&mut prev_tag_size[..]) {
     Ok(4) => {}
-    Ok(read_bytes) => { return Err(ReadError::TooShortFrameTrailer)}
-    Err(err) => { return Err(ReadError::Eof)}
+    Ok(_) => { return Err(ReadError::TooShortFrameTrailer)}
+    Err(_) => { return Err(ReadError::Eof)}
   };
 
 

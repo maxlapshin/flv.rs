@@ -66,8 +66,7 @@ fn main() {
 
 fn dump_flv(path: String) {
     let mut f = File::open(path).unwrap();
-    let mut done = false;
-    while !done {
+    loop {
         let result = flv::read_frame(&mut f);
         match result {
             Ok(frame) => {
